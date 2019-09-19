@@ -23,7 +23,12 @@ public class TestCustomResourceController implements ResourceController<TestCust
     }
 
     @Override
-    public Optional<TestCustomResource> createOrUpdateResource(TestCustomResource resource, Context<TestCustomResource> context) {
+    public Optional<TestCustomResource> createResource(TestCustomResource resource, Context<TestCustomResource> context) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<TestCustomResource> updateResource(TestCustomResource resource, Context<TestCustomResource> context) {
         return Optional.empty();
     }
 }

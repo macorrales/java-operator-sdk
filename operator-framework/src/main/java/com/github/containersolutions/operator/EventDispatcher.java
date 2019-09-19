@@ -58,9 +58,14 @@ public class EventDispatcher<R extends CustomResource> implements Watcher<R> {
                     removeDefaultFinalizer(resource);
                 }
             } else {
-                Optional<R> updateResult = controller.createOrUpdateResource(resource, new Context<>(k8sClient, resourceClient));
-                if (updateResult.isPresent()) {
-                    R updatedResource = updateResult.get();
+                Optional<R> result;
+                if (resource.getMetadata().getGeneration() == null || resource.getMetadata().getGeneration() <= 1) {
+                    result = controller.createResource(resource, new Context<>(k8sClient, resourceClient));
+                } else {
+                    result = controller.updateResource(resource, new Context<>(k8sClient, resourceClient));
+                }
+                if (result.isPresent()) {
+                    R updatedResource = result.get();
                     addFinalizerIfNotPresent(updatedResource);
                     replace(updatedResource);
                     // We always add the default finalizer if missing and not marked for deletion.

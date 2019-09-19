@@ -41,26 +41,34 @@ class EventDispatcherTest {
         testCustomResource.setMetadata(new ObjectMeta());
         testCustomResource.getMetadata().setFinalizers(new ArrayList<>());
 
-        when(resourceController.createOrUpdateResource(eq(testCustomResource), any())).thenReturn(Optional.of(testCustomResource));
+        when(resourceController.createResource(eq(testCustomResource), any())).thenReturn(Optional.of(testCustomResource));
+        when(resourceController.updateResource(eq(testCustomResource), any())).thenReturn(Optional.of(testCustomResource));
         when(resourceController.deleteResource(eq(testCustomResource), any())).thenReturn(true);
     }
 
     @Test
-    public void callCreateOrUpdateOnNewResource() {
+    public void callCreateOnNewResource() {
         eventDispatcher.eventReceived(Watcher.Action.ADDED, testCustomResource);
-        verify(resourceController, times(1)).createOrUpdateResource(ArgumentMatchers.eq(testCustomResource), any());
+        verify(resourceController, times(1)).createResource(ArgumentMatchers.eq(testCustomResource), any());
     }
 
     @Test
-    public void callCreateOrUpdateOnModifiedResource() {
+    public void callUpdateOnUpdated() {
+        eventDispatcher.eventReceived(Watcher.Action.ADDED, testCustomResource);
+        verify(resourceController, times(1)).createResource(ArgumentMatchers.eq(testCustomResource), any());
+    }
+
+
+    @Test
+    public void callUpdateOnModifiedResource() {
         eventDispatcher.eventReceived(Watcher.Action.MODIFIED, testCustomResource);
-        verify(resourceController, times(1)).createOrUpdateResource(ArgumentMatchers.eq(testCustomResource), any());
+        verify(resourceController, times(1)).updateResource(ArgumentMatchers.eq(testCustomResource), any());
     }
 
     @Test
     public void adsDefaultFinalizerOnCreateIfNotThere() {
         eventDispatcher.eventReceived(Watcher.Action.MODIFIED, testCustomResource);
-        verify(resourceController, times(1)).createOrUpdateResource(argThat(new ArgumentMatcher<TestCustomResource>() {
+        verify(resourceController, times(1)).createResource(argThat(new ArgumentMatcher<TestCustomResource>() {
             @Override
             public boolean matches(TestCustomResource testCustomResource) {
                 return testCustomResource.getMetadata().getFinalizers().contains(Controller.DEFAULT_FINALIZER);
@@ -116,7 +124,7 @@ class EventDispatcherTest {
     @Test
     public void doesNotUpdateTheResourceIfEmptyOptionalReturned() {
         testCustomResource.getMetadata().getFinalizers().add(Controller.DEFAULT_FINALIZER);
-        when(resourceController.createOrUpdateResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
+        when(resourceController.updateResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
 
         eventDispatcher.eventReceived(Watcher.Action.MODIFIED, testCustomResource);
 
@@ -125,7 +133,7 @@ class EventDispatcherTest {
 
     @Test
     public void addsFinalizerIfNotMarkedForDeletionAndEmptyCustomResourceReturned() {
-        when(resourceController.createOrUpdateResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
+        when(resourceController.createResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
 
         eventDispatcher.eventReceived(Watcher.Action.MODIFIED, testCustomResource);
 
@@ -136,7 +144,7 @@ class EventDispatcherTest {
     @Test
     public void doesNotAddFinalizerIfOptionalIsReturnedButMarkedForDeletion() {
         markForDeletion(testCustomResource);
-        when(resourceController.createOrUpdateResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
+        when(resourceController.createResource(eq(testCustomResource), any())).thenReturn(Optional.empty());
 
         eventDispatcher.eventReceived(Watcher.Action.MODIFIED, testCustomResource);
 
