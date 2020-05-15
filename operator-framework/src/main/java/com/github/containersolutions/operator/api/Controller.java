@@ -1,8 +1,6 @@
 package com.github.containersolutions.operator.api;
 
 import io.fabric8.kubernetes.client.CustomResource;
-import io.fabric8.kubernetes.client.CustomResourceDoneable;
-import io.fabric8.kubernetes.client.CustomResourceList;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -15,22 +13,17 @@ public @interface Controller {
 
     String DEFAULT_FINALIZER = "operator.default.finalizer";
 
-    String DEFAULT_VERSION = "v1";
-
-    String version() default DEFAULT_VERSION;
-
-    String crdName() default "";
-
-    String group();
-
-    String kind();
+    String crdName();
 
     Class<? extends CustomResource> customResourceClass();
 
-    Class<? extends CustomResourceList<? extends CustomResource>> customResourceListClass();
+    String finalizerName() default DEFAULT_FINALIZER;
 
-    Class<? extends CustomResourceDoneable<? extends CustomResource>> customResourceDonebaleClass();
-
-    String defaultFinalizer() default DEFAULT_FINALIZER;
-
+    /**
+     * If true, will process new event only if generation increased since the last processing, otherwise will
+     * process all events.
+     * See generation meta attribute
+     * <a href="https://kubernetes.io/docs/tasks/access-kubernetes-api/custom-resources/custom-resource-definitions/#status-subresource">here</a>
+     */
+    boolean generationAwareEventProcessing() default true;
 }

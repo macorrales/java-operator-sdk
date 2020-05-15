@@ -1,5 +1,5 @@
 # java-operator-sdk
-[![Build Status](https://travis-ci.org/ContainerSolutions/java-operator-sdk.svg?branch=master)](https://travis-ci.org/ContainerSolutions/java-operator-sdk)
+![Java CI with Maven](https://github.com/ContainerSolutions/java-operator-sdk/workflows/Java%20CI%20with%20Maven/badge.svg)
 
 SDK for building Kubernetes Operators in Java. Inspired by [operator-sdk](https://github.com/operator-framework/operator-sdk).
 In this first iteration we aim to provide a framework which handles the reconciliation loop by dispatching events to
@@ -12,8 +12,13 @@ The Controller only contains the logic to create, update and delete the actual r
 Feature we would like to implement and invite the community to help us implement in the future:
 
 * ~~Spring Boot support~~
-* Testing support
 * Class generation from CRD to POJO
+* GraalVM / Quarkus support
+
+## Additional Features
+
+* Configurable Retry Handling
+* Smart Event Processing Scheduling
 
 ## Usage
 
@@ -22,7 +27,7 @@ We have several sample Operators under the samples directory:
 Implemented with and without Spring Boot support. The two samples share the common module.
 * *webserver*: More realistic example creating an nginx webserver from a Custom Resource containing html code.
 
-Add dependency to your project:
+Add [dependency](https://search.maven.org/search?q=a:operator-framework) to your project:
 
 ```xml
 <dependency>
@@ -48,31 +53,25 @@ The Controller implements the business logic and describes all the classes neede
 
 ```java
 @Controller(customResourceClass = WebServer.class,
-        kind = WebServerController.KIND,
-        group = WebServerController.GROUP,
-        customResourceListClass = WebServerList.class,
-        customResourceDonebaleClass = WebServerDoneable.class)
+        crdName = "webservers.sample.javaoperatorsdk")
 public class WebServerController implements ResourceController<WebServer> {
 
-    static final String KIND = "WebServer";
-    static final String GROUP = "sample.javaoperatorsdk";
-
     @Override
-    public boolean deleteResource(CustomService resource, Context<CustomService> context) {
+    public boolean deleteResource(CustomService resource) {
         // ... your logic ...
         return true;
     }
     
     // Return the changed resource, so it gets updated. See javadoc for details.
     @Override
-    public Optional<CustomService> createOrUpdateResource(CustomService resource, Context<CustomService> context) {
+    public Optional<CustomService> createOrUpdateResource(CustomService resource) {
         // ... your logic ...
         return resource;
     }
 }
 ```
 
-Our custom resource java representation
+A sample custom resource POJO representation
 
 ```java
 public class WebServer extends CustomResource {
@@ -112,26 +111,35 @@ public class WebServerSpec {
 }
 ```
 
-## Spring Boot Support
+### Spring Boot
 
-We provide a spring boot starter to automatically handle bean registration, and registering various components as beans. 
-To use it just include the following dependency to you project: 
+You can also let Spring Boot wire your application together and automatically register the controllers.
 
-```
+Add [this dependency](https://search.maven.org/search?q=a:spring-boot-operator-framework-starter) to your project:
+
+```xml
 <dependency>
  <groupId>com.github.containersolutions</groupId>
  <artifactId>spring-boot-operator-framework-starter</artifactId>
- <version>[version]</version>
+ <version>{see https://search.maven.org/search?q=a:spring-boot-operator-framework-starter for latest version}</version>
 </dependency>
 ```
 
-Note that controllers needs to be registered as beans in the Spring context. For example adding the `@Component` annotation
-on the classes will work.
-See Spring docs for for details, also our spring-boot with component scanning. 
-All controllers that are registered as a bean, gets automatically registered to operator. 
- 
-Kubernetes client creation using properties is also supported, for complete list see: [Link for config class]  
+Create an Application
+```java
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+```
 
+And add Spring's `@Service` annotation to your controller classes so they will be automatically registered as resource controllers.
+
+The Operator's Spring Boot integration leverages [Spring's configuration mechanisms](https://docs.spring.io/spring-boot/docs/1.0.1.RELEASE/reference/html/boot-features-external-config.html) to configure
+- [The Kubernetes client](spring-boot-starter/src/main/java/com/github/containersolutions/operator/spingboot/starter/OperatorProperties.java)
+- [Retries](spring-boot-starter/src/main/java/com/github/containersolutions/operator/spingboot/starter/RetryProperties.java)
 
 ## Implementation / Design details
 
@@ -154,18 +162,23 @@ two ore more, in general it could lead to concurrency issues. Note that we are a
 In this way the operator is not highly available. However for operators this not necessary an issue, 
 if the operator just gets restarted after it went down. 
 
-#### Operator Restarts
-
-When an operator is started we got events for every resource (of a type we listen to) already on the cluster. Even if the resource is not changed 
-(We use `kubectl get ... --watch` in the background). This can be a huge amount of resources depending on your use case.
-So it could be a good case just have a status field on the resource which is checked, if there anything needs to be done.
-
 #### At Least Once
 
 To implement controller logic, we have to override two methods: `createOrUpdateResource` and `deleteResource`. 
 These methods are called if a resource is create/changed or marked for deletion. In most cases these methods will be
 called just once, but in some rare cases can happen that are called more then once. In practice this means that the 
 implementation needs to be **idempotent**.    
+
+#### Smart Scheduling
+
+In our scheduling algorithm we make sure, that no events are processed concurrently for a resource. In addition we provide
+a customizable retry mechanism to deal with temporal errors.
+
+#### Operator Restarts
+
+When an operator is started we got events for every resource (of a type we listen to) already on the cluster. Even if the resource is not changed 
+(We use `kubectl get ... --watch` in the background). This can be a huge amount of resources depending on your use case.
+So it could be a good case just have a status field on the resource which is checked, if there anything needs to be done.
 
 #### Deleting a Resource
 
